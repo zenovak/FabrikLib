@@ -41,6 +41,9 @@ namespace FabrikLib {
                 return beelineSolve(target);
 
             for (int i = 0; i < maxIterations; i++) {
+                if (chain[chain.Length - 1].DistanceSquaredTo(target) < tolerance)
+                    break;
+
                 backwards(target);
                 forward();
             }
