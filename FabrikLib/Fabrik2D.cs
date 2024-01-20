@@ -7,22 +7,8 @@ namespace FabrikLib {
         public float tolerance = 0.1f;
         public int maxIterations = 10;
 
-        public Vector2[] chain { 
-            get 
-                { return chain; } 
-            set {
-                chain = value;
-
-                this.chainMagnitudes = new float[chain.Length];
-                this.chainMagnitudes[0] = 0f;
-                for (int i = 1; i < chain.Length; i++) {
-                    this.chainMagnitudes[i] = chain[i - 1].DistanceTo(chain[i]);
-                }
-
-                this.maxChainMagnitudeSquared = chainMagnitudes.Sum() * chainMagnitudes.Sum();
-                this.origin = chain[0];
-            }
-        }
+        public Vector2[] chain;
+        public Vector2[] chainJointAngleMinMax;
 
         private float[] chainMagnitudes;
         private float maxChainMagnitudeSquared;
@@ -34,11 +20,21 @@ namespace FabrikLib {
 
         public Fabrik2D(Vector2[] chain) {
             this.chain = chain;
+            this.chainMagnitudes = new float[chain.Length];
+            this.chainMagnitudes[0] = 0f;
+            for (int i = 1; i < chain.Length; i++) {
+                this.chainMagnitudes[i] = chain[i - 1].DistanceTo(chain[i]);
+            }
+
+            this.maxChainMagnitudeSquared = chainMagnitudes.Sum() * chainMagnitudes.Sum();
+            this.origin = chain[0];
         }
 
         public Vector2[] solve(Vector2 target) {
-            if (target.DistanceSquaredTo(this.origin) < maxChainMagnitudeSquared)
-                return beelineSolve(target);
+            if (maxChainMagnitudeSquared < target.DistanceSquaredTo(this.origin)) {
+                beelineSolve(target);
+                return chain;
+            }
 
             for (int i = 0; i < maxIterations; i++) {
                 if (chain[chain.Length - 1].DistanceSquaredTo(target) < tolerance)
@@ -52,28 +48,48 @@ namespace FabrikLib {
 
         private void backwards(Vector2 target) {
             chain[chain.Length - 1] = target;
-
+            Vector2 previousSegment;
             for (int i = chain.Length - 2; i >= 0; i--) {
-                var previousSegment = chain[i+1];
-                chain[i] = previousSegment + (previousSegment.DirectionTo(chain[i]) * chainMagnitudes[i]);
+                previousSegment = chain[i + 1];
+                var unclampedDirection = previousSegment.DirectionTo(chain[i]);
+                chain[i] = previousSegment + (unclampedDirection * chainMagnitudes[i]);
+
+                // calculate angles. This task only starts when calculating for the 3rd chain's position.
+                if (i < chain.Length - 2) {
+                    var baselineDirection = -previousSegment.DirectionTo(chain[i + 2]);
+                    var unclammpedAngle = baselineDirection.AngleTo(unclampedDirection);
+                    var clampped = Mathf.Clamp(-unclammpedAngle, chainJointAngleMinMax[i].X, chainJointAngleMinMax[i].Y);
+                    chain[i] = previousSegment + (baselineDirection.Rotated(-clampped) * chainMagnitudes[i]);
+                }
             }
         }
 
         private void forward() {
             chain[0] = origin;
-
+            Vector2 previousSegment;
             for (int i = 1; i < chain.Length; i++) {
-                var previousSegment = chain[i - 1];
-                chain[i] = previousSegment + (previousSegment.DirectionTo(chain[i]) * chainMagnitudes[i]);
+                previousSegment = chain[i-1];
+                var unclampedDirection = previousSegment.DirectionTo(chain[i]);
+                chain[i] = previousSegment + (unclampedDirection * chainMagnitudes[i]);
+
+                if (i > 1) {
+                    var baselineDirection = -previousSegment.DirectionTo(chain[i - 2]);
+                    var unclammpedAngle = baselineDirection.AngleTo(unclampedDirection);
+                    var clampped = Mathf.Clamp(-unclammpedAngle, chainJointAngleMinMax[i].X, chainJointAngleMinMax[i].Y);
+                    chain[i] = previousSegment + (baselineDirection.Rotated(-clampped) * chainMagnitudes[i]);
+                }
             }
         }
 
-        private Vector2[] beelineSolve(Vector2 target) {
+        private void beelineSolve(Vector2 target) {
             var direction = origin.DirectionTo(target);
             for (int i = 1; i < chain.Length; i++) {
-                chain[i] = chain[i] + direction * chainMagnitudes[i];
+                chain[i] = chain[i - 1] + direction * chainMagnitudes[i];
             }
-            return chain;
+        }
+
+        private void calculateJointConstraints() {
+
         }
     }
 }

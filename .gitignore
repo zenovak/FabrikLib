@@ -2,4 +2,4 @@
 .godot/
 
 # VS ignores
-.vs/
+/.vs/*
