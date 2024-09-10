@@ -8,6 +8,20 @@ namespace FabrikLib {
         public int maxIterations = 10;
 
         public Vector2[] chain;
+
+        public Vector2[] chainDirections { 
+            get {
+                if (chain == null) {
+                    throw new Exception("Fabrik. input chain is null. Cannot get chainDirections!");
+                }
+                var directions = new Vector2[chain.Length];
+                for (int i = 0; i < chain.Length - 1; i++) {
+                    directions[i] = chain[i].DirectionTo(chain[i + 1]);
+                }
+                return directions;
+            } 
+        }
+        
         public Vector2[] chainJointAngleMinMax;
 
         private float[] chainMagnitudes;
